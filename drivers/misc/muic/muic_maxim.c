@@ -48,7 +48,13 @@
 
 #include <linux/muic.h>
 
+// needed for USB_OTG
+
+#include "devices.h"
+
 extern int muic_send_cable_type(TYPE_MUIC_MODE mode);
+
+extern void tegra_set_otg(struct platform_device *pdev, bool enable);
 
 #ifdef CONFIG_MACH_STAR
 extern int half_boot_enable;
@@ -155,6 +161,18 @@ void set_max14526_cp_usb_mode(void) //USB_MODE
 	muic_i2c_write_byte(SW_CONTROL, COMP2_TO_U2 | COMN1_TO_U1);
 }
 
+void enable_otg()
+{
+	printk(KERN_DEBUG "[MUIC] Enabling USB OTG");
+	tegra_set_otg(&tegra_otg_device, true);
+}
+
+void disable_otg()
+{
+	printk(KERN_DEBUG "[MUIC] Disabling USB OTG");
+	tegra_set_otg(&tegra_otg_device, false);
+}
+
 
 void set_max14526_muic_mode(unsigned char int_stat_value)
 {
@@ -169,6 +187,7 @@ void set_max14526_muic_mode(unsigned char int_stat_value)
                         muic_i2c_write_byte(CONTROL_1,ID_200 | ADC_EN  | CP_EN );
                         charging_mode = CHARGING_LG_TA;
                         muic_mode = MUIC_LG_TA;
+
                 } else {
                         charging_mode = CHARGING_NONE;
                         muic_mode = MUIC_UNKNOWN;
@@ -230,7 +249,9 @@ void set_max14526_muic_mode(unsigned char int_stat_value)
 #else
 				muic_i2c_write_byte(SW_CONTROL, COMP2_TO_HZ | COMN1_TO_HZ);
 #endif
-				muic_mode = MUIC_LG_TA;
+				set_max14526_ap_usb_mode();
+				enable_otg();
+				muic_mode = MUIC_AP_USB;
 				charging_mode = CHARGING_LG_TA;
 			} else {
 				set_max14526_ap_usb_mode();
@@ -314,14 +335,15 @@ s32 muic_max14526_detect_accessory(s32 upon_irq)
 		case MUIC_CP_UART :
 		case MUIC_AP_USB :
 		case MUIC_CP_USB :
+			disable_otg();
 			if ((int_stat_value & V_VBUS) != 0) {			// V_VBUS == 1
 				set_max14526_muic_mode(int_stat_value);
 			} else if ((int_stat_value & IDNO) == IDNO_1011) {	// V_VBUS == 0
 				charging_mode = CHARGING_NONE;
 				muic_mode = MUIC_NONE;
-#ifdef COFIG_MACH_STAR_SU660
-				printk(KERN_INFO "[******MUIC*********] VBUS NONE UNPLUG\n");
-#endif
+
+				printk(KERN_INFO "[MUIC] VBUS NONE UNPLUG\n");
+
 			} else
 				set_max14526_muic_mode(int_stat_value);
 			break;

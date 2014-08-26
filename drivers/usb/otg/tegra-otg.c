@@ -391,6 +391,24 @@ static ssize_t store_host_en(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
+void tegra_set_otg(struct platform_device *pdev, bool enable)
+{
+	struct tegra_otg_data *tegra = platform_get_drvdata(pdev);
+
+	if (enable) {
+		enable_interrupt(tegra, false);
+		tegra_change_otg_state(tegra, OTG_STATE_A_SUSPEND);
+		tegra_change_otg_state(tegra, OTG_STATE_A_HOST);
+		tegra->interrupt_mode = false;
+	} else {
+		tegra->interrupt_mode = true;
+		tegra_change_otg_state(tegra, OTG_STATE_A_SUSPEND);
+		enable_interrupt(tegra, true);
+	}
+}
+
+EXPORT_SYMBOL(tegra_set_otg);
+
 static DEVICE_ATTR(enable_host, 0644, show_host_en, store_host_en);
 
 static int tegra_otg_probe(struct platform_device *pdev)
